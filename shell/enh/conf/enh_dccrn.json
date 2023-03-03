@@ -1,0 +1,45 @@
+{
+  "epoch_num": 99,
+  "joint": false,
+  "frontend": {
+    "feature": {
+      "type": "stft",
+      "n_fft": 512,
+      "hop_length": 100,
+      "win_length": 400
+    },
+    "model": {
+      "name": "dccrn",
+      "type": "denoise",
+      "parameter": {
+        "input_dim": 512,
+        "num_spk": 1,
+        "rnn_layer": 2,
+        "rnn_units": 256,
+        "masking_mode": "E",
+        "use_clstm": false,
+        "bidirectional": false,
+        "use_cbn": false,
+        "kernel_size": 5,
+        "kernel_num": [
+          32,
+          64,
+          128,
+          256,
+          256,
+          256
+        ],
+        "use_builtin_complex": true,
+        "use_noise_mask": false
+      }
+    },
+    "loss": "si_snr",
+    "scheduler": {
+       "name": "reducelronplateau",
+       "parameter":{
+            "mode": "min",
+            "factor": 0.7,
+            "patience": 1
+       }
+  }
+}
