@@ -122,7 +122,9 @@ def Dataset(data_type,
             conf,
             bpe_model=None,
             non_lang_syms=None,
-            partition=True):
+            partition=True,
+            add_noise=False,
+            add_reverb=False):
     """ Construct dataset from arguments
 
         We have two shuffle stage in the Dataset. The first is global
@@ -155,29 +157,41 @@ def Dataset(data_type,
     speed_perturb = conf.get('speed_perturb', False)
     if speed_perturb:
         dataset = Processor(dataset, processor.speed_perturb)
+    
+    add_noise = conf.get('add_noise', False)
+    if add_noise:
+        noise_conf = conf.get('noise_conf', {})
+        dataset = Processor(dataset, processor.add_noise, **noise_conf)
 
-    feats_type = conf.get('feats_type', 'fbank')
-    assert feats_type in ['fbank', 'mfcc']
-    if feats_type == 'fbank':
-        fbank_conf = conf.get('fbank_conf', {})
-        dataset = Processor(dataset, processor.compute_fbank, **fbank_conf)
-    elif feats_type == 'mfcc':
-        mfcc_conf = conf.get('mfcc_conf', {})
-        dataset = Processor(dataset, processor.compute_mfcc, **mfcc_conf)
+    add_reverb = conf.get('add_reverb', False)
+    if add_reverb:
+        reverb_conf = conf.get('reverb_conf', {})
+        dataset = Processor(dataset, processor.add_reverb, **reverb_conf)
+    
+    yield_wav = conf.get('yield_wav', False)
+    if not yield_wav:
+        feats_type = conf.get('feats_type', 'fbank')
+        assert feats_type in ['fbank', 'mfcc']
+        if feats_type == 'fbank':
+            fbank_conf = conf.get('fbank_conf', {})
+            dataset = Processor(dataset, processor.compute_fbank, **fbank_conf)
+        elif feats_type == 'mfcc':
+            mfcc_conf = conf.get('mfcc_conf', {})
+            dataset = Processor(dataset, processor.compute_mfcc, **mfcc_conf)
 
-    spec_aug = conf.get('spec_aug', True)
-    spec_sub = conf.get('spec_sub', False)
-    spec_trim = conf.get('spec_trim', False)
-    if spec_aug:
-        spec_aug_conf = conf.get('spec_aug_conf', {})
-        dataset = Processor(dataset, processor.spec_aug, **spec_aug_conf)
-    if spec_sub:
-        spec_sub_conf = conf.get('spec_sub_conf', {})
-        dataset = Processor(dataset, processor.spec_sub, **spec_sub_conf)
-    if spec_trim:
-        spec_trim_conf = conf.get('spec_trim_conf', {})
-        dataset = Processor(dataset, processor.spec_trim, **spec_trim_conf)
-
+        spec_aug = conf.get('spec_aug', True)
+        spec_sub = conf.get('spec_sub', False)
+        spec_trim = conf.get('spec_trim', False)
+        if spec_aug:
+            spec_aug_conf = conf.get('spec_aug_conf', {})
+            dataset = Processor(dataset, processor.spec_aug, **spec_aug_conf)
+        if spec_sub:
+            spec_sub_conf = conf.get('spec_sub_conf', {})
+            dataset = Processor(dataset, processor.spec_sub, **spec_sub_conf)
+        if spec_trim:
+            spec_trim_conf = conf.get('spec_trim_conf', {})
+            dataset = Processor(dataset, processor.spec_trim, **spec_trim_conf)
+    
     if shuffle:
         shuffle_conf = conf.get('shuffle_conf', {})
         dataset = Processor(dataset, processor.shuffle, **shuffle_conf)
@@ -189,5 +203,8 @@ def Dataset(data_type,
 
     batch_conf = conf.get('batch_conf', {})
     dataset = Processor(dataset, processor.batch, **batch_conf)
-    dataset = Processor(dataset, processor.padding)
+    if not yield_wav:
+        dataset = Processor(dataset, processor.padding)
+    else:
+        dataset = Processor(dataset, processor.padding_raw_wav)
     return dataset

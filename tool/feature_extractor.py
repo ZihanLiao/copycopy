@@ -3,6 +3,7 @@ import librosa
 
 import torch
 from torch import nn
+import torchaudio.compliance.kaldi as kaldi
 
 from utils import istft, is_complex, make_pad_mask
 
@@ -97,6 +98,30 @@ class STFT(nn.Module):
 #         speech_istft = istft(speech, hop_length=self.hop_length, length=600)
 #         return speech_istft.view(B, C, -1)
 
+class KaldiFbank(torch.nn.Module):
+
+    def __init__(self,
+                n_mels: int = 80,
+                frame_len: int = 25,
+                frame_shift: int = 10,
+                dither: float = 0.0):
+        super().__init__()
+        self.n_mels = n_mels
+        self.frame_len = frame_len
+        self.frame_shift = frame_shift
+        self.dither = dither
+
+    def forward(self, 
+                speech: torch.Tensor,
+                sample_rate: int = 16000):
+        mat = kaldi.fbank(speech,
+                        num_mel_bins=self.n_melss,
+                        frame_length=self.frame_length,
+                        frame_shift=self.frame_shift,
+                        dither=self.dither,
+                        energy_floor=0.0,
+                        sample_frequency=sample_rate)
+        return mat
 
 class FBank(torch.nn.Module):
     """Convert STFT to fbank feats
@@ -177,5 +202,6 @@ class FBank(torch.nn.Module):
 
 feature_classes = dict(
     stft=STFT,
-    fbank=FBank
+    fbank=FBank,
+    kaldi_fbank=KaldiFbank
 )

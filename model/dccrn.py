@@ -289,14 +289,17 @@ class DCCRN(nn.Module):
             mask_imag = F.pad(mask_imag, [0, 0, 1, 0])
 
             # mask shape (B, T, F)
-            if is_torch_1_9_plus and self.use_builtin_complex:
-                complex_mask = torch.complex(
+            complex_mask = torch.complex(
                     mask_real.permute(0, 2, 1), mask_imag.permute(0, 2, 1)
                 )
-            else:
-                complex_mask = ComplexTensor(
-                    mask_real.permute(0, 2, 1), mask_imag.permute(0, 2, 1)
-                )
+            # if is_torch_1_9_plus and self.use_builtin_complex:
+            #     complex_mask = torch.complex(
+            #         mask_real.permute(0, 2, 1), mask_imag.permute(0, 2, 1)
+            #     )
+            # else:
+            #     complex_mask = ComplexTensor(
+            #         mask_real.permute(0, 2, 1), mask_imag.permute(0, 2, 1)
+            #     )
 
             masks.append(complex_mask)
 
@@ -348,14 +351,17 @@ class DCCRN(nn.Module):
                 real, imag = real * mask_real, imag * mask_imag
 
             # shape (B, F, T) --> (B, T, F)
-            if is_torch_1_9_plus and self.use_builtin_complex:
-                masked.append(
+            masked.append(
                     torch.complex(real.permute(0, 2, 1), imag.permute(0, 2, 1))
                 )
-            else:
-                masked.append(
-                    ComplexTensor(real.permute(0, 2, 1), imag.permute(0, 2, 1))
-                )
+            # if is_torch_1_9_plus and self.use_builtin_complex:
+            #     masked.append(
+            #         torch.complex(real.permute(0, 2, 1), imag.permute(0, 2, 1))
+            #     )
+            # else:
+            #     masked.append(
+            #         ComplexTensor(real.permute(0, 2, 1), imag.permute(0, 2, 1))
+            #     )
         return masked
 
     @property

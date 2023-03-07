@@ -5,10 +5,11 @@ import torch
 from torch import nn
 
 from model.dccrn import DCCRN
-from wenet.transformer.asr_model import WenetASRModel
-from legos.enh.loss import SiSnr
+import wenet.transformer.asr_model as WenetTransfromer
+from legos.general.loss import SiSnr
 from tool.feature_extractor import STFT, FBank
 
+WenetASRModel = WenetTransfromer.ASRModel
 
 class EnhAsr(nn.Module):
     
@@ -24,6 +25,7 @@ class EnhAsr(nn.Module):
                 ):
         assert check_argument_types()
         assert calc_enh_loss is True and enh_loss_type is not None
+        super().__init__()
         self.enh_model = enh_model
         self.asr_model = asr_model
         self.enh_feature_extractor = enh_feature_extractor
@@ -35,10 +37,10 @@ class EnhAsr(nn.Module):
 
     def forward(self,
                 speech_mix: torch.Tensor,
+                speech_ref: torch.Tensor,
                 speech_length: torch.Tensor,
-                target: str,  
-                target_length: torch.Tensor,
-                **kwargs):
+                target: torch.Tensor,  
+                target_length: torch.Tensor) -> torch.Tensor:
         # speech to TF feature
         feats, feats_len = self.enh_feature_extractor(speech_mix, speech_length)
         # enh model forward
@@ -48,14 +50,10 @@ class EnhAsr(nn.Module):
         batch_size = speech_mix.shape[0]
 
         enh_loss = None
-        ref_speech = None
         if self.calc_enh_loss:
-            assert "speech_ref" in kwargs
-            ref_speech = kwargs["speech_ref"]
-            ref_speech.unsqueeze(0)
-
+            speech_ref.unsqueeze(0)
             # Calculate enhancement loss
-            enh_loss = self.enh_loss_type(ref_speech, enh_speech)
+            enh_loss = self.enh_loss_type(speech_ref, enh_speech)
 
         asr_feats, asr_feats_len = self.asr_feature_extractor(enh_speech, enh_speech_len)
         loss_dict = self.asr_model(asr_feats, asr_feats_len,
@@ -65,9 +63,6 @@ class EnhAsr(nn.Module):
         loss = enh_loss + asr_loss if self.calc_enh_loss else asr_loss
         return loss
 
-if __name__ == '__main__':
-    
-    
 
 
 

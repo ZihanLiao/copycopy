@@ -16,9 +16,13 @@ import logging
 import json
 import random
 import re
+import io
 import tarfile
 from subprocess import PIPE, Popen
 from urllib.parse import urlparse
+import numpy as np
+import wavfile
+import signal
 
 import torch
 import torchaudio
@@ -219,6 +223,67 @@ def resample(data, resample_rate=16000):
             sample['sample_rate'] = resample_rate
             sample['wav'] = torchaudio.transforms.Resample(
                 orig_freq=sample_rate, new_freq=resample_rate)(waveform)
+        yield sample
+
+
+def add_reverb(data, reverb_source, aug_prob):
+    for sample in data:
+        assert 'wav' in sample
+        if aug_prob > random.random():
+            if 'wav_mix' in sample:
+                audio = sample['wav_mix'].numpy()[0]
+            else:
+                audio = sample['wav'].numpy()[0]
+            audio_len = audio.shape[0]
+            _, rir_data = reverb_source.random_one()
+            rir_io = io.BytesIO(rir_data)
+            _, rir_audio = wavfile.read(rir_io)
+            rir_audio = rir_audio.astype(np.float32)
+            rir_audio = rir_audio / np.sqrt(np.sum(rir_audio**2))
+            out_audio = signal.convolve(audio, rir_audio,
+                                        mode='full')[:audio_len]
+            out_audio = torch.from_numpy(out_audio)
+            out_audio = torch.unsqueeze(out_audio, 0)
+            sample['wav_mix'] = out_audio
+        yield 
+
+
+def add_noise(data, noise_source, aug_prob):
+    for sample in data:
+        assert 'wav' in sample
+        assert 'key' in sample
+        if aug_prob > random.random():
+            if 'wav_mix' in sample:
+                audio = sample['wav_mix'].numpy()[0]
+            else:
+                audio = sample['wav'].numpy()[0]
+            audio_len = audio.shape[0]
+            audio_db = 10 * np.log10(np.mean(audio**2) + 1e-4)
+            key, noise_data = noise_source.random_one()
+            if key.startswith('noise'):
+                snr_range = [0, 15]
+            elif key.startswith('speech'):
+                snr_range = [5, 30]
+            elif key.startswith('music'):
+                snr_range = [5, 15]
+            else:
+                snr_range = [0, 15]
+            _, noise_audio = wavfile.read(io.BytesIO(noise_data))
+            noise_audio = noise_audio.astype(np.float32)
+            if noise_audio.shape[0] > audio_len:
+                start = random.randint(0, noise_audio.shape[0] - audio_len)
+                noise_audio = noise_audio[start:start + audio_len]
+            else:
+                # Resize will repeat copy
+                noise_audio = np.resize(noise_audio, (audio_len, ))
+            noise_snr = random.uniform(snr_range[0], snr_range[1])
+            noise_db = 10 * np.log10(np.mean(noise_audio**2) + 1e-4)
+            noise_audio = np.sqrt(10**(
+                (audio_db - noise_db - noise_snr) / 10)) * noise_audio
+            out_audio = audio + noise_audio
+            out_audio = torch.from_numpy(out_audio)
+            out_audio = torch.unsqueeze(out_audio, 0)
+            sample['wav_mix'] = out_audio
         yield sample
 
 
@@ -640,3 +705,62 @@ def padding(data):
 
         yield (sorted_keys, padded_feats, padding_labels, feats_lengths,
                label_lengths)
+
+
+def padding_raw_wav(data):
+    """ Padding the data into training data
+
+        Args:
+            data: Iterable[List[{key, wav, wav_mix, Optional[label]}]]
+
+        Returns:
+            Iterable[Tuple(keys, wav, labels, Optional[wav_mix], wav lengths, label lengths)]
+    """
+    for sample in data:
+        assert isinstance(sample, list)
+        wav_lengths, label_lengths = [], []
+        wav_mix = False
+        for x in sample:
+            assert 'wav' in x
+            if 'wav_mix' in x:
+                assert x['wav'].size(0) == x['wav_mix'].size(0)
+                wav_mix = True
+            wav_lengths.append(x['wav'].size(0))
+            label_lengths.append(x['label'].size(0))
+        wav_lengths = torch.tensor(wav_lengths, dtype=torch.int32)
+        order = torch.argsort(wav_lengths, descending=True)
+        wav_lengths = torch.tensor(
+                    [sample[i]['wav'].size(0) for i in order], dtype=torch.int32)
+        sorted_wav = [sample[i]['wav'] for i in order]
+        sorted_key = [sample[i]['key'] for i in order]
+
+        sorted_labels = [
+            torch.tensor(sample[i]['label'], dtype=torch.int64) for i in order
+        ]
+
+        if wav_mix:
+            sorted_wav_mix = [sample[i]['wav_mix'] for i in order]
+        
+        padding_wav = pad_sequence(sorted_wav,
+                                  batch_first=True,
+                                  padding_value=0)
+        padding_label = pad_sequence(sorted_labels,
+                                    batch_first=True,
+                                    padding_value=-1)
+        if wav_mix:
+            padding_wav_mix = pad_sequence(sorted_wav_mix,
+                                           batch_first=True,
+                                           padding_value=0)
+        return (sorted_key,
+                padding_wav, 
+                padding_label, 
+                padding_wav_mix, 
+                wav_lengths, 
+                label_lengths) if wav_mix else (sorted_key,
+                padding_wav, 
+                padding_label, 
+                None, 
+                wav_lengths, 
+                label_lengths)
+
+            

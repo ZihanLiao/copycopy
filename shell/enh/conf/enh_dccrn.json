@@ -1,9 +1,58 @@
 {
   "epoch_num": 99,
-  "joint": false,
+  "mission": "enh_asr",
+  "dataset_conf": {
+    "filter_conf": {
+        "max_length": 40960,
+        "min_length": 0,
+        "token_max_length": 200,
+        "token_min_length": 1
+    },
+    "resample_conf": {
+        "resample_rate": 16000
+    },
+    "speed_perturb": true,
+    "add_noise": false,
+    "noise_conf": {
+      "noise_source": "./",
+      "aug_prob": 0.3
+    },
+    "add_reverb": true,
+    "reverb_conf": {
+      "reverb_source": "/home/share_ssd_data/env/liaozihan/wekws/examples/hi_xiaowen/s2/data/rir/rir.lmdb",
+      "aug_prob": 0.3
+    },
+    "yield_wav": true,
+    "fbank_conf": {
+        "num_mel_bins": 80,
+        "frame_shift": 10,
+        "frame_length": 25,
+        "dither": 0.1
+    },
+    "spec_aug": true,
+    "spec_aug_conf": {
+        "num_t_mask": 2,
+        "num_f_mask": 2,
+        "max_t": 50,
+        "max_f": 10
+    },
+    "shuffle": true,
+    "shuffle_conf": {
+        "shuffle_size": 1500
+    },
+    "sort": false,
+    "sort_conf": {
+        "sort_size": 500
+    },
+    "batch_conf": {
+        "batch_type": "static",
+        "batch_size": 16
+    }
+  },
   "frontend": {
+    "type": "enh",
     "feature": {
-      "type": "stft",
+      "name": "stft",
       "n_fft": 512,
       "hop_length": 100,
       "win_length": 400
@@ -33,13 +82,28 @@
         "use_noise_mask": false
       }
     },
-    "loss": "si_snr",
-    "scheduler": {
-       "name": "reducelronplateau",
-       "parameter":{
-            "mode": "min",
-            "factor": 0.7,
-            "patience": 1
-       }
-  }
+    "loss": {
+        "name": "si_snr"
+    }
+  },
+  "downstream": {
+      "type": "asr",
+      "feature": {
+        "name": "kaldi_fbank",
+        "n_mels": 80,
+        "frame_len": 25,
+        "frame_shift": 10,
+        "dither": 0.0
+      },
+    "use_wenet_downstream": true,
+    "wenet_downstream_config": "/Users/marlowe/workspace/myownspeechtoolbox/shell/enh/conf/train_conformer.yaml"
+  },
+  "scheduler": {
+    "name": "reducelronplateau",
+    "parameter":{
+         "mode": "min",
+         "factor": 0.7,
+         "patience": 1
+        }
+    }
 }
