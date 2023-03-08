@@ -5,7 +5,7 @@ import torch
 from torch import nn
 import torchaudio.compliance.kaldi as kaldi
 
-from utils import istft, is_complex, make_pad_mask
+from utils import is_complex, make_pad_mask
 
 class STFT(nn.Module):
     
@@ -47,6 +47,7 @@ class STFT(nn.Module):
                     )
                     + 1
                 )
+            output.masked_fill_(make_pad_mask(olens, output, 1), 0.0)
         return output, olens
     
     def inverse(

@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import random
-
+from typing import Optional
 import torch
 import torch.distributed as dist
 from torch.utils.data import IterableDataset
@@ -118,13 +118,11 @@ class DataList(IterableDataset):
 
 def Dataset(data_type,
             data_list_file,
-            symbol_table,
+            symbol_table: Optional[dict],
             conf,
             bpe_model=None,
             non_lang_syms=None,
-            partition=True,
-            add_noise=False,
-            add_reverb=False):
+            partition=True):
     """ Construct dataset from arguments
 
         We have two shuffle stage in the Dataset. The first is global
@@ -208,3 +206,20 @@ def Dataset(data_type,
     else:
         dataset = Processor(dataset, processor.padding_raw_wav)
     return dataset
+
+if __name__ == '__main__':
+    from tool.utils import read_symbol_table
+    import json
+    with open("conf/enh_dccrn.json", 'r') as f:
+        conf = json.load(f)
+    dataset_conf = conf['dataset_conf']
+    symbol_table = read_symbol_table("data/local/dict/lang_char.txt")
+    dataset = Dataset('raw', 'data/local/train/train.list', symbol_table,
+                    dataset_conf)
+    for x in dataset:
+        (sorted_key, padding_wav, padding_label, _, wav_lengths, label_lengths) = x
+        print(padding_wav.shape)
+        print(padding_label.shape)
+        print(wav_lengths)
+        print(label_lengths)
+        break

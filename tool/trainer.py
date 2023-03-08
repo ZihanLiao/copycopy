@@ -13,12 +13,12 @@ def train_single(model,
 
 def train_joint(model,
                 optimizer,
-                schduler,
+                scheduler,
                 train_dataloader,
                 dev_dataloader,
+                n_epoch,
                 **kwargs):
-    assert "epoch_num" in kwargs
-    n_epoch = kwargs['epoch_num']
+    n_epoch = kwargs.get('epoch_num', 99)
     device = kwargs.get('device', 'cpu')
     is_distributed = kwargs.get('is_distributed', False)
     rank = kwargs.get('rank', 0)
@@ -33,8 +33,14 @@ def train_joint(model,
         model_context = nullcontext
 
     for current_epoch in range(n_epoch):
+        logging.info("INFO: ############ epoch {} ############".format(current_epoch))
         with model_context():
             for batch_idx, batch in enumerate(train_dataloader):
-                wav
+                (sorted_key, padding_wav, padding_label, padding_wav_mix, wav_lengths, label_lengths) = batch
+                loss = model(padding_wav_mix,
+                             padding_wav,
+                             wav_lengths,
+                             padding_label,
+                             label_lengths)
     return
 

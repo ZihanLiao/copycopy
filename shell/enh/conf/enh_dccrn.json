@@ -17,7 +17,7 @@
       "noise_source": "./",
       "aug_prob": 0.3
     },
-    "add_reverb": true,
+    "add_reverb": false,
     "reverb_conf": {
       "reverb_source": "/home/share_ssd_data/env/liaozihan/wekws/examples/hi_xiaowen/s2/data/rir/rir.lmdb",
       "aug_prob": 0.3
@@ -105,5 +105,11 @@
          "factor": 0.7,
          "patience": 1
         }
+    },
+    "optimizer": {
+      "name": "adam",
+      "parameter": {
+        "lr": 0.002
+      }
     }
 }

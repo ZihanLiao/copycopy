@@ -725,33 +725,32 @@ def padding_raw_wav(data):
             if 'wav_mix' in x:
                 assert x['wav'].size(0) == x['wav_mix'].size(0)
                 wav_mix = True
-            wav_lengths.append(x['wav'].size(0))
-            label_lengths.append(x['label'].size(0))
+            wav_lengths.append(x['wav'].shape[1])
         wav_lengths = torch.tensor(wav_lengths, dtype=torch.int32)
         order = torch.argsort(wav_lengths, descending=True)
         wav_lengths = torch.tensor(
-                    [sample[i]['wav'].size(0) for i in order], dtype=torch.int32)
-        sorted_wav = [sample[i]['wav'] for i in order]
+                    [sample[i]['wav'].size(1) for i in order], dtype=torch.int32)
+        sorted_wav = [sample[i]['wav'].transpose(1,0) for i in order]
         sorted_key = [sample[i]['key'] for i in order]
 
         sorted_labels = [
             torch.tensor(sample[i]['label'], dtype=torch.int64) for i in order
         ]
-
+        label_lengths = torch.tensor([x.size(0) for x in sorted_labels],
+                                     dtype=torch.int32)
         if wav_mix:
             sorted_wav_mix = [sample[i]['wav_mix'] for i in order]
-        
         padding_wav = pad_sequence(sorted_wav,
-                                  batch_first=True,
-                                  padding_value=0)
+                                   batch_first=True,
+                                   padding_value=0)
         padding_label = pad_sequence(sorted_labels,
-                                    batch_first=True,
-                                    padding_value=-1)
+                                     batch_first=True,
+                                     padding_value=-1)
         if wav_mix:
             padding_wav_mix = pad_sequence(sorted_wav_mix,
                                            batch_first=True,
                                            padding_value=0)
-        return (sorted_key,
+        yield (sorted_key,
                 padding_wav, 
                 padding_label, 
                 padding_wav_mix, 

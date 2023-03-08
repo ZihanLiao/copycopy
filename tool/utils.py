@@ -1,6 +1,15 @@
 import torch
 import torch.nn.functional as F
 
+def read_symbol_table(symbol_table_file):
+    symbol_table = {}
+    with open(symbol_table_file, 'r', encoding='utf8') as fin:
+        for line in fin:
+            arr = line.strip().split()
+            assert len(arr) == 2
+            symbol_table[arr[0]] = int(arr[1])
+    return symbol_table
+
 def model_info(model):  # Plots a line-by-line description of a PyTorch model
     n_p = sum(x.numel() for x in model.parameters())  # number parameters
     n_g = sum(x.numel() for x in model.parameters() if x.requires_grad)  # number gradients

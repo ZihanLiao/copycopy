@@ -37,7 +37,7 @@ class EnhAsr(nn.Module):
 
     def forward(self,
                 speech_mix: torch.Tensor,
-                speech_ref: torch.Tensor,
+                speech_ref: Optional[torch.Tensor],
                 speech_length: torch.Tensor,
                 target: torch.Tensor,  
                 target_length: torch.Tensor) -> torch.Tensor:
