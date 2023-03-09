@@ -1,0 +1,93 @@
+# copycopy config yaml
+epoch_num: 99
+mission: enh_asr
+dataset_conf:
+  filter_conf:
+    max_length: 40960
+    min_length: 0
+    token_max_length: 200
+    token_min_length: 1
+  resample_conf:
+    resample_rate: 16000
+  speed_perturb: true
+  add_noise: false
+  noise_conf:
+    noise_source: "./"
+    aug_prob: 0
+  add_reverb: true
+  reverb_conf:
+    reverb_source: "/Users/marlowe/workspace/myownspeechtoolbox/shell/enh/data/local/rir/rir.lmdb"
+    aug_prob: 1
+  yield_wav: true
+  fbank_conf:
+    num_mel_bins: 80
+    frame_shift: 10
+    frame_length: 25
+    dither: 0.1
+  spec_aug: true
+  spec_aug_conf:
+    num_t_mask: 2
+    num_f_mask: 2
+    max_t: 50
+    max_f: 10
+  shuffle: true
+  shuffle_conf:
+    shuffle_size: 1500
+  sort: false
+  sort_conf:
+    sort_size: 500
+  batch_conf:
+    batch_type: static
+    batch_size: 16
+frontend:
+  type: enh
+  feature:
+    name: stft
+    n_fft: 512
+    hop_length: 100
+    win_length: 400
+  model:
+    name: dccrn
+    type: denoise
+    parameter:
+      input_dim: 256
+      num_spk: 1
+      rnn_layer: 2
+      rnn_units: 256
+      masking_mode: E
+      use_clstm: true
+      bidirectional: false
+      use_cbn: false
+      kernel_size: 5
+      kernel_num:
+      - 32
+      - 64
+      - 128
+      - 256
+      - 256
+      - 256
+      use_builtin_complex: true
+      use_noise_mask: false
+  loss:
+    name: si_snr
+downstream:
+  type: asr
+  feature:
+    name: fbank
+    fs: 16000
+    n_fft: 512
+    win_length: 400
+    hop_length: 100
+    n_mels: 40
+  use_wenet_downstream: true
+  wenet_downstream_config: "/Users/marlowe/workspace/myownspeechtoolbox/shell/enh/conf/train_conformer.yaml"
+scheduler:
+  name: reducelronplateau
+  parameter:
+    mode: min
+    factor: 0.7
+    patience: 1
+optimizer:
+  name: adam
+  parameter:
+    lr: 0.001

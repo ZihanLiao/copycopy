@@ -15,12 +15,12 @@
     "add_noise": false,
     "noise_conf": {
       "noise_source": "./",
-      "aug_prob": 0.3
+      "aug_prob": 0.0
     },
-    "add_reverb": false,
+    "add_reverb": true,
     "reverb_conf": {
-      "reverb_source": "/home/share_ssd_data/env/liaozihan/wekws/examples/hi_xiaowen/s2/data/rir/rir.lmdb",
-      "aug_prob": 0.3
+      "reverb_source": "/Users/marlowe/workspace/myownspeechtoolbox/shell/enh/data/local/rir/rir.lmdb",
+      "aug_prob": 1.0
     },
     "yield_wav": true,
     "fbank_conf": {
@@ -61,12 +61,12 @@
       "name": "dccrn",
       "type": "denoise",
       "parameter": {
-        "input_dim": 512,
+        "input_dim": 256,
         "num_spk": 1,
         "rnn_layer": 2,
         "rnn_units": 256,
         "masking_mode": "E",
-        "use_clstm": false,
+        "use_clstm": true,
         "bidirectional": false,
         "use_cbn": false,
         "kernel_size": 5,
@@ -89,11 +89,12 @@
   "downstream": {
       "type": "asr",
       "feature": {
-        "name": "kaldi_fbank",
-        "n_mels": 80,
-        "frame_len": 25,
-        "frame_shift": 10,
-        "dither": 0.0
+        "name": "fbank",
+        "fs": 16000,
+        "n_fft": 512,
+        "win_length": 400,
+        "hop_length": 100,
+        "n_mels": 40
       },
     "use_wenet_downstream": true,
     "wenet_downstream_config": "/Users/marlowe/workspace/myownspeechtoolbox/shell/enh/conf/train_conformer.yaml"
@@ -109,7 +110,7 @@
     "optimizer": {
       "name": "adam",
       "parameter": {
-        "lr": 0.002
+        "lr": 0.001
       }
     }
 }

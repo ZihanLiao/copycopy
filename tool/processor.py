@@ -21,8 +21,8 @@ import tarfile
 from subprocess import PIPE, Popen
 from urllib.parse import urlparse
 import numpy as np
-import wavfile
-import signal
+from scipy.io import wavfile
+from scipy import signal
 
 import torch
 import torchaudio
@@ -236,8 +236,7 @@ def add_reverb(data, reverb_source, aug_prob):
                 audio = sample['wav'].numpy()[0]
             audio_len = audio.shape[0]
             _, rir_data = reverb_source.random_one()
-            rir_io = io.BytesIO(rir_data)
-            _, rir_audio = wavfile.read(rir_io)
+            _, rir_audio = wavfile.read(io.BytesIO(rir_data))
             rir_audio = rir_audio.astype(np.float32)
             rir_audio = rir_audio / np.sqrt(np.sum(rir_audio**2))
             out_audio = signal.convolve(audio, rir_audio,
@@ -245,7 +244,7 @@ def add_reverb(data, reverb_source, aug_prob):
             out_audio = torch.from_numpy(out_audio)
             out_audio = torch.unsqueeze(out_audio, 0)
             sample['wav_mix'] = out_audio
-        yield 
+        yield sample
 
 
 def add_noise(data, noise_source, aug_prob):
@@ -723,7 +722,7 @@ def padding_raw_wav(data):
         for x in sample:
             assert 'wav' in x
             if 'wav_mix' in x:
-                assert x['wav'].size(0) == x['wav_mix'].size(0)
+                assert x['wav'].size(1) == x['wav_mix'].size(1)
                 wav_mix = True
             wav_lengths.append(x['wav'].shape[1])
         wav_lengths = torch.tensor(wav_lengths, dtype=torch.int32)
@@ -739,7 +738,7 @@ def padding_raw_wav(data):
         label_lengths = torch.tensor([x.size(0) for x in sorted_labels],
                                      dtype=torch.int32)
         if wav_mix:
-            sorted_wav_mix = [sample[i]['wav_mix'] for i in order]
+            sorted_wav_mix = [sample[i]['wav_mix'].transpose(1,0) for i in order]
         padding_wav = pad_sequence(sorted_wav,
                                    batch_first=True,
                                    padding_value=0)
@@ -761,5 +760,3 @@ def padding_raw_wav(data):
                 None, 
                 wav_lengths, 
                 label_lengths)
-
-            

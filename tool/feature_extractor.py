@@ -1,8 +1,9 @@
-from typing import Tuple
+from typing import Tuple, Optional
 import librosa
 
 import torch
 from torch import nn
+import torchaudio
 import torchaudio.compliance.kaldi as kaldi
 
 from utils import is_complex, make_pad_mask
@@ -12,31 +13,49 @@ class STFT(nn.Module):
     def __init__(
         self,
         n_fft: int=512, 
-        hop_length: int=100, 
         win_length: int=400,
+        hop_length: int=100, 
         center: bool=True,
         normalized: bool = False,
-        onesided: bool=True
+        onesided: bool=True,
+        window: Optional[str]="hann"
     ):
         super().__init__()
         self.n_fft = n_fft
-        self.hop_length = hop_length
         self.win_length = win_length
+        self.hop_length = hop_length
         self.center = center
-        self.normalize = normalized
+        self.normalized = normalized
         self.onesided = onesided
+        if window is not None and not hasattr(torch, f"{window}_window"):
+            raise ValueError(f"{window} window is not implemented")
+        self.window = window
 
     def forward(
         self, 
         input: torch.Tensor,
         ilens: torch.Tensor=None
     ):
+        if self.window is not None:
+            window_func = getattr(torch, f"{self.window}_window")
+            window = window_func(
+                self.win_length, dtype=input.dtype, device=input.device
+            )
+        else:
+            window = None
         output = torch.stft(
             input,
             n_fft=self.n_fft, 
-            hop_length=self.hop_length, 
-            win_length=self.win_length, 
-            return_complex=True)
+            win_length=self.win_length,
+            hop_length=self.hop_length,
+            center=self.center,
+            window=window,
+            pad_mode='reflect',
+            normalized=self.normalized,
+            onesided=self.onesided,
+            return_complex=True) # (B, F, T)
+
+        output = output.transpose(1, 2) # (B, F, T) -> (B, T, F)
         if ilens is not None:
             if self.center:
                 pad = self.n_fft // 2
@@ -48,6 +67,8 @@ class STFT(nn.Module):
                     + 1
                 )
             output.masked_fill_(make_pad_mask(olens, output, 1), 0.0)
+        else:
+            olens = None
         return output, olens
     
     def inverse(
@@ -70,12 +91,11 @@ class STFT(nn.Module):
         elif input.shape[-1] != 2:
             raise TypeError("Invalid input type")
         input = input.transpose(1, 2)
-
         wavs = istft(
             input,
             n_fft=self.n_fft,
-            hop_length=self.hop_length,
             win_length=self.win_length,
+            hop_length=self.hop_length,
             center=self.center,
             normalized=self.normalized,
             onesided=self.onesided,
@@ -83,29 +103,68 @@ class STFT(nn.Module):
         )
         return wavs, ilens
 
-# class ISTFT(nn.Module):
-#     def __init__(
-#         self, 
-#         n_fft: int=512, 
-#         hop_length: int=256, 
-#         win_length: int=512
-#         ):
-#         super().__init__()
-#         self.n_fft, self.hop_length, self.win_length = n_fft, hop_length, win_length
+class ISTFT(nn.Module):
+    
+    def __init__(self,
+                n_fft: int=512,
+                win_length: int=400,
+                hop_length: int=100,
+                center: bool=True,
+                normalized: bool = False,
+                onesided: bool=True,
+                window: Optional[str]="hann"):
+        super().__init__()
+        self.n_fft = n_fft
+        self.win_length = win_length
+        self.hop_length = hop_length
+        self.window = window
+        self.center = center
+        self.normalized = normalized
+        self.onesided = onesided
 
-#     def forward(self, speech):
-#         B, C, F, T, D = speech.shape
-#         x = speech.view(B, F, T, D)
-#         speech_istft = istft(speech, hop_length=self.hop_length, length=600)
-#         return speech_istft.view(B, C, -1)
+        self.istft = torch.functional.istft
+    
+    def forward(self,
+                input: torch.Tensor,
+                ilens: torch.Tensor):
+        if self.window is not None:
+            window_func = getattr(torch, f"{self.window}_window")
+            if is_complex(input):
+                datatype = input.real.dtype
+            else:
+                datatype = input.dtype
+            window = window_func(
+                self.win_length, dtype=datatype, device=input.device
+            )
+        else:
+            window = None
 
-class KaldiFbank(torch.nn.Module):
+        if is_complex(input):
+            input = torch.stack([input.real, input.imag], dim=-1)
+        elif input.shape[-1] != 2:
+            raise TypeError("Invalid input type")
+        input = input.transpose(1, 2)
+        
+        wavs = self.istft(
+            input,
+            n_fft=self.n_fft,
+            hop_length=self.hop_length,
+            win_length=self.win_length,
+            window=window,
+            center=self.center,
+            normalized=self.normalized,
+            onesided=self.onesided,
+            length=ilens.max() if ilens is not None else ilens,
+        )
+        return wavs, ilens
+
+class KaldiFbank(nn.Module):
 
     def __init__(self,
-                n_mels: int = 80,
-                frame_len: int = 25,
-                frame_shift: int = 10,
-                dither: float = 0.0):
+                n_mels: int=80,
+                frame_len: int=25,
+                frame_shift: int=10,
+                dither: float=0.0):
         super().__init__()
         self.n_mels = n_mels
         self.frame_len = frame_len
@@ -114,10 +173,10 @@ class KaldiFbank(torch.nn.Module):
 
     def forward(self, 
                 speech: torch.Tensor,
-                sample_rate: int = 16000):
+                sample_rate: int=16000):
         mat = kaldi.fbank(speech,
-                        num_mel_bins=self.n_melss,
-                        frame_length=self.frame_length,
+                        num_mel_bins=self.n_mels,
+                        frame_length=self.frame_len,
                         frame_shift=self.frame_shift,
                         dither=self.dither,
                         energy_floor=0.0,
@@ -141,16 +200,20 @@ class FBank(torch.nn.Module):
 
     def __init__(
         self,
-        fs: int = 16000,
-        n_fft: int = 512,
-        n_mels: int = 80,
-        fmin: float = None,
-        fmax: float = None,
-        htk: bool = False,
-        log_base: float = None,
+        fs: int=16000,
+        n_fft: int=512,
+        win_length: int=400,
+        hop_length: int=100,
+        n_mels: int=80,
+        fmin: float=None,
+        fmax: float=None,
+        htk: bool=False,
+        log_base: float=None,
     ):
         super().__init__()
-
+        self.stft = STFT(n_fft=n_fft,
+                        win_length=win_length,
+                        hop_length=hop_length)
         fmin = 0 if fmin is None else fmin
         fmax = fs / 2 if fmax is None else fmax
         _mel_options = dict(
@@ -174,11 +237,13 @@ class FBank(torch.nn.Module):
 
     def forward(
         self,
-        feat: torch.Tensor,
+        speech: torch.Tensor,
         ilens: torch.Tensor = None,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         # feat: (B, T, D1) x melmat: (D1, D2) -> mel_feat: (B, T, D2)
-        mel_feat = torch.matmul(feat, self.melmat)
+        stft, stft_len =self.stft(speech, ilens)
+        input_power = stft.real**2 + stft.imag**2
+        mel_feat = torch.matmul(input_power, self.melmat)
         mel_feat = torch.clamp(mel_feat, min=1e-10)
 
         if self.log_base is None:
@@ -196,13 +261,14 @@ class FBank(torch.nn.Module):
                 make_pad_mask(ilens, logmel_feat, 1), 0.0
             )
         else:
-            ilens = feat.new_full(
-                [feat.size(0)], fill_value=feat.size(1), dtype=torch.long
+            ilens = stft.new_full(
+                [stft.size(0)], fill_value=stft.size(1), dtype=torch.long
             )
-        return logmel_feat, ilens
+        return logmel_feat, stft_len
 
 feature_classes = dict(
     stft=STFT,
+    istft=ISTFT,
     fbank=FBank,
     kaldi_fbank=KaldiFbank
 )

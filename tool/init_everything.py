@@ -103,7 +103,10 @@ def init_model(config: dict, mission: str):
 def init_feature_extractor(config: dict):
     feature_name = config.pop('name')
     feature = feature_classes.get(feature_name, None)
-    return feature(**config)
+    if feature_name == "stft":
+        feature_inv = feature_classes.get("istft", None)
+    return (feature(**config), feature_inv(**config)) \
+                if feature_name == "stft" else (feature(**config), None)
 
 def init_loss(config: dict):
     loss_name = config.pop("name")

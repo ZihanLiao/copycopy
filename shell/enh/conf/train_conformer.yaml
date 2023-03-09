@@ -1,4 +1,4 @@
-# network architecture
+# wenet config yaml
 # encoder related
 encoder: conformer
 encoder_conf:
@@ -38,8 +38,8 @@ grad_clip: 5
 accum_grad: 4
 max_epoch: 240
 log_interval: 100
-input_dim: 80
-output_dim: 100
+input_dim: 40
+output_dim: 1313
 cmvn_file: /Users/marlowe/workspace/myownspeechtoolbox/shell/enh/exp/global_cmvn.xiaoxin
 is_json_cmvn: true
 

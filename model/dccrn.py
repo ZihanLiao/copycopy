@@ -93,6 +93,8 @@ class DCCRN(nn.Module):
         if self.use_clstm:
             rnns = []
             for idx in range(rnn_layer):
+                input_size=hidden_dim * self.kernel_num[-1] if idx == 0 else self.rnn_units * fac
+                print(hidden_dim)
                 rnns.append(
                     DCCRNNavieComplexLSTM(
                         input_size=hidden_dim * self.kernel_num[-1]
@@ -190,8 +192,10 @@ class DCCRN(nn.Module):
         # spec_phase = torch.atan2(imag, real)
         # shape (B, 2, F, T)
         cspecs = torch.stack([real, imag], 1)
+        print(cspecs.shape)
         # shape (B, 2, F-1, T)
         cspecs = cspecs[:, :, 1:]
+        print(cspecs.shape)
 
         out = cspecs
         encoder_out = []
@@ -216,6 +220,8 @@ class DCCRN(nn.Module):
             i_rnn_in = torch.reshape(
                 i_rnn_in, [lengths, batch_size, channels // 2 * dims]
             )
+            print("r_rnn_in", r_rnn_in.shape)
+            print("i_rnn_in", i_rnn_in.shape)
             r_rnn_in, i_rnn_in = self.enhance([r_rnn_in, i_rnn_in])
             # shape (T, B, C // 2, F)
             r_rnn_in = torch.reshape(
@@ -259,7 +265,7 @@ class DCCRN(nn.Module):
             others["mask_noise1"] = masks[-1]
             others["noise1"] = masked.pop(-1)
 
-        return (masked, ilens, others)
+        return (masked[0], ilens, others)
     
         
     def flatten_parameters(self):

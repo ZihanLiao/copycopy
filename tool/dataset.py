@@ -20,7 +20,7 @@ from torch.utils.data import IterableDataset
 
 import tool.processor as processor
 from tool.utils import read_lists
-
+from tool.lmbd_data import LmdbData
 
 class Processor(IterableDataset):
     def __init__(self, source, f, *args, **kw):
@@ -159,12 +159,20 @@ def Dataset(data_type,
     add_noise = conf.get('add_noise', False)
     if add_noise:
         noise_conf = conf.get('noise_conf', {})
-        dataset = Processor(dataset, processor.add_noise, **noise_conf)
+        noise_lmdb = noise_conf.get('noise_source', None)
+        noise_prob = noise_conf.get('aug_prob', 0)
+        if noise_lmdb and noise_prob > 0:
+            noise_data = LmdbData(noise_lmdb)
+            dataset = Processor(dataset, processor.add_noise, noise_data, noise_prob)
 
     add_reverb = conf.get('add_reverb', False)
     if add_reverb:
         reverb_conf = conf.get('reverb_conf', {})
-        dataset = Processor(dataset, processor.add_reverb, **reverb_conf)
+        reverb_lmdb = reverb_conf.get('reverb_source', None)
+        reverb_prob = reverb_conf.get('aug_prob', 0)
+        if reverb_lmdb and reverb_prob > 0:
+            reverb_data = LmdbData(reverb_lmdb)
+            dataset = Processor(dataset, processor.add_reverb, reverb_data, reverb_prob)
     
     yield_wav = conf.get('yield_wav', False)
     if not yield_wav:
@@ -207,6 +215,7 @@ def Dataset(data_type,
         dataset = Processor(dataset, processor.padding_raw_wav)
     return dataset
 
+
 if __name__ == '__main__':
     from tool.utils import read_symbol_table
     import json
@@ -216,10 +225,22 @@ if __name__ == '__main__':
     symbol_table = read_symbol_table("data/local/dict/lang_char.txt")
     dataset = Dataset('raw', 'data/local/train/train.list', symbol_table,
                     dataset_conf)
+
+    from tool.init_everything import (
+    init_model, 
+    init_scheduler,
+    init_optimizer
+    )
+    fp = open("/Users/marlowe/workspace/myownspeechtoolbox/shell/enh/conf/enh_dccrn.json", 'r')
+    config = json.load(fp)
+    fp.close()
+    model = init_model(config, 'enh_asr')
     for x in dataset:
-        (sorted_key, padding_wav, padding_label, _, wav_lengths, label_lengths) = x
-        print(padding_wav.shape)
-        print(padding_label.shape)
-        print(wav_lengths)
-        print(label_lengths)
+        (sorted_key, padding_wav, padding_label, padding_wav_mix, wav_lengths, label_lengths) = x
+        enh_loss, asr_loss, loss = model(speech_mix=padding_wav_mix,
+                    speech_ref=padding_wav,
+                    speech_length=wav_lengths,
+                    target=padding_label,
+                    target_length=label_lengths)
+        loss.backward()
         break

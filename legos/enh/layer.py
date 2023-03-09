@@ -13,6 +13,7 @@ class DCCRNNavieComplexLSTM(nn.Module):
         batch_first=False,
     ):
         super(DCCRNNavieComplexLSTM, self).__init__()
+        print("input_size", input_size)
         self.bidirectional = bidirectional
         self.input_dim = input_size // 2
         self.rnn_units = hidden_size // 2

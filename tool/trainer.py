@@ -26,7 +26,6 @@ def train_joint(model,
     logging.info('using accumulate grad, new batch size is {} times'
                      ' larger than before'.format(accum_grad))
     model.train()
-
     if isinstance(model, torch.nn.parallel.DistributedDataParallel):
         model_context = model.join
     else:
@@ -37,7 +36,7 @@ def train_joint(model,
         with model_context():
             for batch_idx, batch in enumerate(train_dataloader):
                 (sorted_key, padding_wav, padding_label, padding_wav_mix, wav_lengths, label_lengths) = batch
-                loss = model(padding_wav_mix,
+                enh_loss, asr_loss, loss = model(padding_wav_mix,
                              padding_wav,
                              wav_lengths,
                              padding_label,
