@@ -19,6 +19,7 @@ nj=16
 stage=0
 stop_stage=0
 
+# training arguments
 database=
 dir=
 checkpoint=

@@ -12,7 +12,11 @@ from tool.feature_extractor import STFT, FBank
 WenetASRModel = WenetTransfromer.ASRModel
 
 class EnhAsr(nn.Module):
-    
+    """
+    Human Listening and Live Captioning:
+    Multi-Task Training for Speech Enhancement
+    https://arxiv.org/pdf/2106.02896.pdf
+    """
     def __init__(self,
                 enh_model: Union[DCCRN, None],
                 asr_model: Union[WenetASRModel, None],

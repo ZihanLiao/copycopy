@@ -87,6 +87,12 @@ def main():
     epoch_num = config.pop('epoch_num', 99)
     mission = config.pop('mission')
     print("current mission is: {}".format(mission))
+
+    symbol_table = None
+    if 'asr' in mission:
+        assert args.symbol_table
+        symbol_table = read_symbol_table(args.symbol_table)
+
     # Init optimizer
     optimizer_config = config.pop('optimizer')
     optimizer = init_optimizer(optimizer_config)
@@ -96,16 +102,13 @@ def main():
         
     # Init model
     model_config = config
+    config['output_dim'] = len(symbol_table.items())
     model = init_model(model_config, mission)
     num_params = sum(p.numel() for p in model.parameters())
     print('the number of model params: {:,d}'.format(num_params))
 
     dataset_config = config.pop('dataset_conf', {})
-
-    symbol_table = None
-    if 'asr' in mission:
-        assert args.symbol_table
-        symbol_table = read_symbol_table(args.symbol_table)
+    
             
     if args.checkpoint is not None:
         infos = load_checkpoint(model, args.checkpoint)
